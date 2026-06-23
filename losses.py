@@ -63,8 +63,14 @@ def make_hint(mask, hint_rate):
 
 
 def loss_stats_tensor(rec, kl, adv, cls, epoch_ratio):
-    """构造元网络输入统计量，并 detach 避免统计量本身引入不必要高阶图。"""
-    return torch.stack([
+    """构造元网络输入统计量。
+
+    使用 log1p 压缩损失尺度，避免分类 CE 或 KL 的量级过大时把元网络推到
+    极端输出，从而提高 TrainLoss 下降的稳定性。
+    """
+    stats = torch.stack([
         rec.detach(), kl.detach(), adv.detach(), cls.detach(),
         torch.as_tensor(epoch_ratio, device=rec.device, dtype=rec.dtype),
-    ]).view(1, -1)
+    ])
+    stats[:4] = torch.log1p(torch.clamp(stats[:4], min=0.0))
+    return stats.view(1, -1)

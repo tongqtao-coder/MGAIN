@@ -92,6 +92,7 @@ def train_meta_gain(generator, discriminator, meta_net, classifier, loaders, cfg
             d_loss = discriminator_loss(d_prob, mask, cfg.eps)
             opt_d.zero_grad()
             d_loss.backward()
+            torch.nn.utils.clip_grad_norm_(discriminator.parameters(), cfg.grad_clip_norm)
             opt_d.step()
 
             # 2) 元网络根据主训练 batch 的损失统计输出 beta/gamma/eta。
@@ -106,13 +107,14 @@ def train_meta_gain(generator, discriminator, meta_net, classifier, loaders, cfg
             grads = torch.autograd.grad(inner_loss, tuple(params.values()), create_graph=True, allow_unused=True)
             fast_params = OrderedDict()
             for (name, param), grad in zip(params.items(), grads):
-                fast_params[name] = param if grad is None else param - cfg.lr_main * grad
+                fast_params[name] = param if grad is None else param - cfg.inner_lr * grad
 
             # 4) 用虚拟更新后的主网络填充元数据缺失部分，与元数据完整版计算 ARMSE，更新元网络。
             x_meta_hat, _, _, _ = virtual_generator_forward(generator, fast_params, x_meta_miss, m_meta)
             meta_loss = armse(x_meta_full, x_meta_hat, m_meta, strict_formula=True)
             opt_meta.zero_grad()
             meta_loss.backward()
+            torch.nn.utils.clip_grad_norm_(meta_net.parameters(), cfg.grad_clip_norm)
             opt_meta.step()
 
             # 5) 用更新后的元网络重新输出权重，正式更新主生成器。
@@ -123,6 +125,7 @@ def train_meta_gain(generator, discriminator, meta_net, classifier, loaders, cfg
             main_loss = rec2 + beta2 * kl2 + gamma2 * cls2 + eta2 * adv2
             opt_g.zero_grad()
             main_loss.backward()
+            torch.nn.utils.clip_grad_norm_(generator.parameters(), cfg.grad_clip_norm)
             opt_g.step()
 
             total_main_loss += main_loss.item() * x_full.size(0)

@@ -19,7 +19,11 @@ def main():
     classifier = MLPClassifier(input_dim=input_dim, num_classes=num_classes)
     generator = VAEGenerator(input_dim=input_dim, hidden_dim=cfg.hidden_dim, latent_dim=cfg.latent_dim)
     discriminator = Discriminator(input_dim=input_dim, hidden_dim=cfg.hidden_dim)
-    meta_net = MetaNet(input_dim=5, hidden_dim=cfg.meta_hidden_dim)
+    meta_net = MetaNet(
+        input_dim=5, hidden_dim=cfg.meta_hidden_dim,
+        max_beta=cfg.max_beta, max_gamma=cfg.max_gamma, max_eta=cfg.max_eta,
+        min_weight=cfg.min_meta_weight,
+    )
 
     print("开始预训练并冻结下游 MLP 分类器...")
     pretrain_classifier(classifier, loaders["classifier"], cfg, device)

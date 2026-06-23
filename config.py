@@ -21,10 +21,11 @@ class Config:
     batch_size: int = 128
     epochs: int = 100
     classifier_pretrain_epochs: int = 30
-    lr_main: float = 0.01
-    lr_discriminator: float = 0.01
-    lr_meta: float = 0.001
+    lr_main: float = 0.005
+    lr_discriminator: float = 0.005
+    lr_meta: float = 0.0005
     lr_classifier: float = 0.01
+    inner_lr: float = 0.001
     momentum: float = 0.9
     weight_decay: float = 0.0
 
@@ -34,6 +35,15 @@ class Config:
     meta_hidden_dim: int = 64
     num_classes: int = 26
     hint_rate: float = 0.9
+
+    # 元网络输出权重上界：防止 KL/分类/对抗项权重无界增大导致 TrainLoss 发散
+    max_beta: float = 0.1
+    max_gamma: float = 0.1
+    max_eta: float = 0.2
+    min_meta_weight: float = 1e-4
+
+    # 梯度裁剪：提高 SGD + 元学习二阶梯度训练稳定性
+    grad_clip_norm: float = 5.0
 
     # 损失稳定项
     eps: float = 1e-8

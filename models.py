@@ -60,17 +60,29 @@ class Discriminator(nn.Module):
 
 
 class MetaNet(nn.Module):
-    """元网络：根据当前损失统计输出 beta、gamma、eta 三个正权重。"""
-    def __init__(self, input_dim=5, hidden_dim=64):
+    """元网络：根据当前损失统计输出 beta、gamma、eta 三个有界正权重。
+
+    之前直接用 softplus 会让权重无上界，KL/分类/对抗项权重可能越来越大，
+    造成你观察到的 TrainLoss 逐渐变大。这里改为 sigmoid + 上界，使元网络
+    仍然能自适应调权，但不会把主损失放大到不稳定。
+    """
+    def __init__(
+        self, input_dim=5, hidden_dim=64,
+        max_beta=0.1, max_gamma=0.1, max_eta=0.2, min_weight=1e-4,
+    ):
         super().__init__()
+        self.register_buffer("max_weights", torch.tensor([max_beta, max_gamma, max_eta], dtype=torch.float32))
+        self.min_weight = min_weight
         self.net = nn.Sequential(
             nn.Linear(input_dim, hidden_dim), nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
             nn.Linear(hidden_dim, 3),
         )
+        # 初始输出接近各自上界的 25%，避免训练刚开始 KL/分类/对抗项过强。
+        nn.init.constant_(self.net[-1].bias, -1.1)
 
     def forward(self, stats):
-        weights = F.softplus(self.net(stats)) + 1e-6
+        weights = self.min_weight + torch.sigmoid(self.net(stats)) * self.max_weights.to(stats.device)
         beta, gamma, eta = weights[:, 0].mean(), weights[:, 1].mean(), weights[:, 2].mean()
         return beta, gamma, eta
 
